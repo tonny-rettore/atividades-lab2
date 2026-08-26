@@ -66,7 +66,7 @@ Str s_cria(char const *strC)
 
     // Conta quantos caracteres Unicode existem
     int nbytes_temp = s->nbytes;
-    s->nunichars = u8_conta_unichar_nos_bytes(&s->nbytes, strC);
+    s->nunichars = u8_conta_unichar_nos_bytes(&nbytes_temp, strC);
 
     // Alocação
     s->nalloc = MIN_ALLOC;
@@ -85,10 +85,9 @@ Str s_cria(char const *strC)
 void s_destroi(Str s)
 {
     s_ok(s);
-    
+
     free(s->bytes);
     free(s);
-
 }
 
 Str s_cria_substring(Str_c s, int pos, int tam)
@@ -107,8 +106,32 @@ Str s_cria_cópia(Str_c s)
 // Retorna uma string vazia em caso de erro.
 Str s_cria_de_arquivo(char *nome)
 {
-    Str s = s_cria("");
-    //...
+    FILE *arq = fopen(nome, "r");
+
+    if (arq == NULL)
+        return s_cria("");
+
+    fseek(arq, 0, SEEK_END); // leva cursor pro final
+    int tamanho = ftell(arq); // diz posicao do cursor ou seja tamanho do texto
+    rewind(arq); // retorna cursor pro inicio
+
+    char *texto = malloc(tamanho + 1);
+
+    if (texto == NULL)
+    {
+        fclose(arq);
+        return s_cria("");
+    }
+
+    int n = fread(texto, 1, tamanho, arq);
+    texto[n] = '\0';
+
+    fclose(arq);
+
+    Str s = s_cria(texto);
+
+    free(texto);
+
     return s;
 }
 
@@ -117,22 +140,49 @@ Str s_cria_de_arquivo(char *nome)
 int s_tam(Str_c s)
 {
     s_ok(s);
-    u8_conta_unichar_nos_bytes(s->nbytes, s->bytes);
-    return 0;
+    return s->nunichars;
 }
 
 char *s_strc(Str_c s)
 {
     s_ok(s);
-    //...
-    return NULL;
+
+    char *str = malloc(s->nbytes + 1);
+
+    if (str == NULL)
+        return NULL;
+
+    memcpy(str, s->bytes, s->nbytes);
+
+    str[s->nbytes] = '\0';
+
+    return str;
 }
 
 unichar s_ch(Str_c s, int pos)
 {
     s_ok(s);
-    //...
-    return UNI_INV;
+
+    if (pos < 0)
+        pos += s->nunichars;
+    if (pos < 0 || pos >= s->nunichars)
+        return UNI_INV;
+
+    byte *p = u8_avanca_unichar(s->bytes, pos);
+
+    unichar c;
+
+    u8_unichar_nos_bytes(s->nbytes, p, &c);
+
+    return c;
+
+    // Nas funções abaixo, o argumento `pos` refere-se à posição de um
+    //   caractere (e não de um byte) em uma string. Esse argumento deve ser
+    //   interpretado da seguinte forma:
+    //   - se ele for 0 representa a posição do primeiro caractere da string;
+    //     se for 1 a do segundo etc
+    //   - se ele for -1, representa a posição logo após o último caractere da string;
+    //     se for -2, a posição do último caractere etc
 }
 
 // operações de busca e comparação {{{1
