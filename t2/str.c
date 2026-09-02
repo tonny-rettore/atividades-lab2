@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <limits.h>
 
 #define MIN_ALLOC 8 // alocação mínima
 
@@ -15,16 +16,6 @@ struct str
     int nalloc;    // quantidade de bytes alocados
     int nunichars; // quantidade de caracteres Unicode
 };
-
-// A memória para conter os bytes de uma string deve ser alocada e/ou
-//   realocada conforme a necessidade, cuidando para que a quantidade
-//   de memória alocada seja sempre:
-//   - nula (não alocada) se a string for vazia, ou
-//   - não inferior ao necessário para armazenar os bytes da codificação utf8;
-//   - não inferior à alocação mínima;
-//   - não superior ao triplo do número de bytes necessários
-//     (exceto quando for o mínimo);
-//   - uma potência de 2.
 
 // funções auxiliares {{{1
 
@@ -46,6 +37,7 @@ static void s_ok(Str_c s)
 }
 
 // operações de criação e destruição {{{1
+
 
 Str s_cria(char const *strC)
 {
@@ -103,8 +95,6 @@ Str s_cria_cópia(Str_c s)
     return s_cria_substring(s, 0, -1);
 }
 
-// Retorna uma nova string com o conteúdo do arquivo chamado nome.
-// Retorna uma string vazia em caso de erro.
 Str s_cria_de_arquivo(char *nome)
 {
     FILE *arq = fopen(nome, "r");
@@ -112,11 +102,27 @@ Str s_cria_de_arquivo(char *nome)
     if (arq == NULL)
         return s_cria("");
 
-    fseek(arq, 0, SEEK_END);  // leva cursor pro final
-    int tamanho = ftell(arq); // diz posicao do cursor ou seja tamanho do texto
-    rewind(arq);              // retorna cursor pro inicio
+    if (fseek(arq, 0, SEEK_END) != 0)
+    {
+        fclose(arq);
+        return s_cria("");
+    }
 
-    char *texto = malloc(tamanho + 1);
+    long tam = ftell(arq);
+
+    if (tam < 0 || tam >= LONG_MAX - 1)
+    {
+        fclose(arq);
+        return s_cria("");
+    }
+
+    if (fseek(arq, 0, SEEK_SET) != 0)
+    {
+        fclose(arq);
+        return s_cria("");
+    }
+
+    char *texto = malloc(tam + 1);
 
     if (texto == NULL)
     {
@@ -124,7 +130,7 @@ Str s_cria_de_arquivo(char *nome)
         return s_cria("");
     }
 
-    int n = fread(texto, 1, tamanho, arq);
+    size_t n = fread(texto, 1, (size_t)tam, arq);
     texto[n] = '\0';
 
     fclose(arq);
@@ -153,7 +159,8 @@ char *s_strc(Str_c s)
     if (str == NULL)
         return NULL;
 
-    memcpy(str, s->bytes, s->nbytes);
+    if (s->nbytes > 0)
+        memcpy(str, s->bytes, s->nbytes);
 
     str[s->nbytes] = '\0';
 
@@ -197,7 +204,7 @@ bool s_igual(Str_c s, Str_c sb)
         return false;
     }
 
-    // Se ambas forem strings vazias (nbytes == 0)
+    // Se ambas forem strings vazias nbytes == 0
     if (s->nbytes == 0)
     {
         return true;
@@ -214,6 +221,8 @@ int s_busca_c(Str_c s, int pos, Str_c sb)
 
     if (pos < 0)
         pos += s->nunichars + 1;
+    if (pos < 0)
+        pos = 0;
 
     for (int i = pos; i < s->nunichars; i++)
     {
@@ -236,6 +245,8 @@ int s_busca_nc(Str_c s, int pos, Str_c sb)
 
     if (pos < 0)
         pos += s->nunichars + 1;
+    if (pos < 0)
+        pos = 0;
 
     for (int i = pos; i < s->nunichars; i++)
     {
@@ -266,6 +277,8 @@ int s_busca_rc(Str_c s, int pos, Str_c sb)
 
     if (pos < 0)
         pos += s->nunichars + 1;
+    if (pos > s->nunichars)
+        pos = s->nunichars;
 
     for (int i = pos - 1; i >= 0; i--)
     {
@@ -288,6 +301,8 @@ int s_busca_rnc(Str_c s, int pos, Str_c sb)
 
     if (pos < 0)
         pos += s->nunichars + 1;
+    if (pos > s->nunichars)
+        pos = s->nunichars;
 
     for (int i = pos - 1; i >= 0; i--)
     {
@@ -322,7 +337,16 @@ int s_busca_s(Str_c s, int pos, Str_c buscada)
     int tam_buscada = s_tam(buscada);
 
     if (tam_buscada == 0)
+    {
+        if (pos < 0)
+            pos = 0;
+        if (pos > s->nunichars)
+            pos = s->nunichars;
         return pos;
+    }
+
+    if (pos < 0)
+        pos = 0;
 
     for (int i = pos; i + tam_buscada <= s_tam(s); i++)
     {
@@ -349,7 +373,7 @@ void s_substitui(Str s, int pos, int tam, Str_c sb)
 {
     s_ok(s);
 
-    // trata sb == NULL como string vazia
+    // trata sb == null como string vazia
     int nb_sb = 0;
     byte *bytes_sb = NULL;
 
@@ -366,7 +390,7 @@ void s_substitui(Str s, int pos, int tam, Str_c sb)
     if (pos < 0)
         pos += n + 1;
 
-    // resolve tam negativo (até o final de s)
+    // resolve tam negativo até o final de s
     int fim = (tam < 0) ? n : pos + tam;
 
     // corrige os limites do intervalo
@@ -399,11 +423,12 @@ void s_substitui(Str s, int pos, int tam, Str_c sb)
         novo_bytes = malloc(novo_nalloc);
         assert(novo_bytes != NULL);
 
-        memcpy(novo_bytes, s->bytes, byte_inicio); // prefixo
+        if (byte_inicio > 0)
+            memcpy(novo_bytes, s->bytes, byte_inicio);
         if (nb_sb > 0)
-            memcpy(novo_bytes + byte_inicio, bytes_sb, nb_sb); // conteúdo novo
-        memcpy(novo_bytes + byte_inicio + nb_sb,
-               s->bytes + byte_fim, s->nbytes - byte_fim); // sufixo
+            memcpy(novo_bytes + byte_inicio, bytes_sb, nb_sb);
+        if (s->nbytes - byte_fim > 0)
+            memcpy(novo_bytes + byte_inicio + nb_sb, s->bytes + byte_fim, s->nbytes - byte_fim);
     }
 
     free(s->bytes);
@@ -506,9 +531,11 @@ void s_insere_c(Str s, int pos, unichar c)
     byte *novo_bytes = malloc(novo_nalloc);
     assert(novo_bytes != NULL);
 
-    memcpy(novo_bytes, s->bytes, byte_pos);                                          // prefixo
-    memcpy(novo_bytes + byte_pos, buf, nb_c);                                        // char novo
-    memcpy(novo_bytes + byte_pos + nb_c, s->bytes + byte_pos, s->nbytes - byte_pos); // sufixo
+    if (byte_pos > 0)
+        memcpy(novo_bytes, s->bytes, byte_pos);
+    memcpy(novo_bytes + byte_pos, buf, nb_c);
+    if (s->nbytes - byte_pos > 0)
+        memcpy(novo_bytes + byte_pos + nb_c, s->bytes + byte_pos, s->nbytes - byte_pos);
 
     free(s->bytes);
 
@@ -538,17 +565,16 @@ void s_apara(Str s, Str_c sobras)
     s_ok(s);
     s_ok(sobras);
 
-    // primeira posição (a partir de 0) com um caractere que NÃO é sobra
+    // primeira posição a partir de 0 com um caractere que NÃO é sobra
     int inicio = s_busca_nc(s, 0, sobras);
 
     if (inicio == -1)
     {
-        // toda a string é feita de caracteres de sobras (ou já era vazia)
         s_substitui(s, 0, -1, NULL);
         return;
     }
 
-    // última posição (antes do fim) com um caractere que NÃO é sobra
+    // última posição antes do fim com um caractere que NÃO é sobra
     int fim = s_busca_rnc(s, s_tam(s), sobras);
 
     int tam = fim - inicio + 1;
@@ -560,7 +586,6 @@ void s_apara(Str s, Str_c sobras)
 
 void s_imprime(Str_c s)
 {
-
     s_ok(s);
 
     if (s->nbytes > 0)
