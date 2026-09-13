@@ -36,9 +36,34 @@ Lista l_cria()
 // exemplos:
 //   "a,ba,ca, te", ", " -> ["a" "ba" "ca" "te"]
 //   "aba \ncate\n", "\n" -> ["aba " "cate"]
-// Lista l_cria_separando(Str s, Str sep){
-  
-// }
+Lista l_cria_separando(Str s, Str sep)
+{
+    Lista l = l_cria();
+
+    int inicio = 0;
+
+    for (int i = 0; i < s_tam(s); i++)
+    {
+        if (s_busca_c(s, i, sep) == i)
+        {
+            if (i > inicio)
+            {
+                Str parte = s_cria_substring(s, inicio, i - inicio);
+                l_insere_fim(&l, parte);
+            }
+
+            inicio = i + 1;
+        }
+    }
+
+    if (inicio < s_tam(s))
+    {
+        Str parte = s_cria_substring(s, inicio, s_tam(s) - inicio);
+        l_insere_fim(&l, parte);
+    }
+
+    return l;
+}
 
 // libera a memória ocupada por uma lista
 void l_destroi(Lista l)
