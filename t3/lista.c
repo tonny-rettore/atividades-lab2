@@ -73,6 +73,7 @@ void l_destroi(Lista l)
     while (atual != l->sentinela)
     {
         prox = atual->prox;
+        s_destroi(atual->dado);
         free(atual);
         atual = prox;
     }
