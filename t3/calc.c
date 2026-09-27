@@ -1,8 +1,10 @@
 #include "calc.h"
+#include "dicionario.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef enum
 {
@@ -12,21 +14,30 @@ typedef enum
     CAT_POT,         // coluna ^  -> 3
     CAT_ABRE_PAREN,  // coluna (  -> 4
     CAT_FECHA_PAREN, // coluna )  -> 5
+    CAT_IGUAL,       // coluna =  -> 6
     CAT_OPERANDO,    // não é coluna/linha da tabela
     CAT_ERRO         // não é coluna/linha da tabela
 } Categoria;
 
+typedef struct calc
+{
+    Dicionário dic;
+} *Calc;
+
+static Calc CALC = NULL;
+
 // AUXILIARES
 const char tabela(int topo, int entrada)
 {
-    static const char tab[5][6] =
+    static const char tab[6][7] =
         {
-            //  F	   +-  * /	 ^	  (	   )    // p\e
-            {'T', 'E', 'E', 'E', 'E', 'R'},  // V
-            {'O', 'O', 'E', 'E', 'E', 'O'},  // +-
-            {'O', 'O', 'O', 'E', 'E', 'O'},  // */
-            {'O', 'O', 'O', 'E', 'E', 'O'},  // ^
-            {'R', 'E', 'E', 'E', 'E', 'D'}}; // (
+            //    F	   +-   */	 ^	  (     )   =      // p\e
+            {'T', 'E', 'E', 'E', 'E', 'R', 'E'},  // V
+            {'O', 'O', 'E', 'E', 'E', 'O', 'E'},  // +-
+            {'O', 'O', 'O', 'E', 'E', 'O', 'E'},  // */
+            {'O', 'O', 'O', 'E', 'E', 'O', 'E'},  // ^
+            {'R', 'E', 'E', 'E', 'E', 'D', 'E'},  // (
+            {'O', 'E', 'E', 'E', 'E', 'O', 'E'}}; // =
 
     return tab[topo][entrada];
 }
@@ -58,6 +69,39 @@ static bool eh_caractere_identificador(unichar c)
     return eh_letra(c) || eh_digito(c) || c == '_' || c == '$';
 }
 
+// funcoes pra ser usada no dicionario
+static bool str_igual(chave_t a, chave_t b)
+{
+    Str sa = a;
+    Str sb = b;
+    return s_igual(sa, sb);
+}
+
+static bool str_menor(chave_t a, chave_t b)
+{
+    Str sa = a;
+    Str sb = b;
+
+    char *ca = s_strc(sa); // converte pra string c
+    char *cb = s_strc(sb);
+
+    bool resultado = strcmp(ca, cb) < 0;
+
+    free(ca);
+    free(cb);
+
+    return resultado;
+}
+
+static void garante_quecalc_criado(void)
+{
+    if (CALC == NULL)
+    {
+        CALC = malloc(sizeof(*CALC));
+        CALC->dic = dic_cria(str_menor, str_igual);
+    }
+}
+
 static Categoria classifica(Str token)
 {
     int tam = s_tam(token);
@@ -66,6 +110,8 @@ static Categoria classifica(Str token)
 
     if (tam == 1)
     {
+        if (primeiro == '=')
+            return CAT_IGUAL;
         if (primeiro == '+' || primeiro == '-')
             return CAT_MAIS_MENOS;
 
@@ -99,6 +145,32 @@ static Categoria classifica_topo(Lista pilha_op)
     return classifica(topo);
 }
 
+static double valor_de_operando(Str operando, bool *ok)
+{
+    unichar primeiro = s_ch(operando, 0);
+
+    // se é um número literal
+    if (eh_digito(primeiro) || primeiro == '.')
+    {
+        *ok = true;
+        return s_número(operando);
+    }
+
+    // se é uma variável (começa com letra ou $)
+    garante_quecalc_criado();
+
+    Str valor_str = dic_busca(CALC->dic, operando);
+
+    if (valor_str == VALOR_NÃO_EXISTE)
+    {
+        *ok = false; // variável não existe no dicionário
+        return 0;
+    }
+
+    *ok = true;
+    return s_número(valor_str);
+}
+
 static bool opera(Lista pilha_op, Lista pilha_oper)
 {
     Str operador = l_desempilha(pilha_oper);
@@ -112,8 +184,18 @@ static bool opera(Lista pilha_op, Lista pilha_oper)
     Str str_dir = l_desempilha(pilha_op);
     Str str_esq = l_desempilha(pilha_op);
 
-    double esq = s_número(str_esq);
-    double dir = s_número(str_dir);
+    bool ok_esq, ok_dir;
+    double esq = valor_de_operando(str_esq, &ok_esq);
+    double dir = valor_de_operando(str_dir, &ok_dir);
+
+    if (!ok_esq || !ok_dir)
+    {
+        s_destroi(str_esq);
+        s_destroi(str_dir);
+        s_destroi(operador);
+        return false;
+    }
+
     double res = 0;
 
     unichar op = s_ch(operador, 0);
@@ -129,11 +211,21 @@ static bool opera(Lista pilha_op, Lista pilha_oper)
 
     switch (op)
     {
-        case '+': res = esq + dir; break;
-        case '-': res = esq - dir; break;
-        case '*': res = esq * dir; break;
-        case '/': res = esq / dir; break;
-        case '^': res = pow(esq, dir); break;
+    case '+':
+        res = esq + dir;
+        break;
+    case '-':
+        res = esq - dir;
+        break;
+    case '*':
+        res = esq * dir;
+        break;
+    case '/':
+        res = esq / dir;
+        break;
+    case '^':
+        res = pow(esq, dir);
+        break;
     }
 
     l_empilha(pilha_op, s_cria_número(res));
@@ -184,9 +276,63 @@ Lista tokeniza(Str txt)
 
     return tokens;
 }
+static bool atribui(Lista pilha_op, Lista pilha_oper)
+{
+    Str operador_igual = l_desempilha(pilha_oper); // pro =
+
+    if (l_tam(pilha_op) < 2)
+    {
+        s_destroi(operador_igual);
+        return false;
+    }
+
+    Str str_valor = l_desempilha(pilha_op);
+    Str str_nome = l_desempilha(pilha_op);
+
+    bool ok;
+    double valor = valor_de_operando(str_valor, &ok);
+
+    if (!ok)
+    {
+        s_destroi(str_valor);
+        s_destroi(str_nome);
+        s_destroi(operador_igual);
+        return false;
+    }
+
+    Str valor_como_str = s_cria_número(valor);
+
+    // 2 retirado precisa ser nome válido
+    unichar primeiro = s_ch(str_nome, 0);
+    if (!eh_inicio_identificador(primeiro))
+    {
+        s_destroi(str_valor);
+        s_destroi(str_nome);
+        s_destroi(valor_como_str);
+        s_destroi(operador_igual);
+        return false;
+    }
+
+    garante_quecalc_criado();
+
+    Str valor_antigo = dic_insere(CALC->dic, str_nome, valor_como_str);
+
+    if (valor_antigo != VALOR_NÃO_EXISTE)
+        s_destroi(valor_antigo);
+
+    l_empilha(pilha_op, s_cria_cópia(valor_como_str));
+
+    s_destroi(str_valor);
+    s_destroi(operador_igual);
+
+    return true;
+}
 
 Str calculadora(Str expressão)
 {
+
+    garante_quecalc_criado();
+
     Lista tokens = tokeniza(expressão);
     Lista pilha_op = l_cria();
     Lista pilha_oper = l_cria();
@@ -217,39 +363,48 @@ Str calculadora(Str expressão)
 
         switch (acao)
         {
-            case 'E':
-                l_empilha(pilha_oper, s_cria_cópia(l_dado_pos(tokens, i)));
-                i++;
-                break;
+        case 'E':
+            l_empilha(pilha_oper, s_cria_cópia(l_dado_pos(tokens, i)));
+            i++;
+            break;
 
-            case 'O':
-                if (!opera(pilha_op, pilha_oper))
-                {
-                    resultado = s_cria("#ERRO faltam operandos");
-                }
-                break;
+        case 'O':
+        {
+            Str topo_oper = l_topo(pilha_oper);
+            unichar c = s_ch(topo_oper, 0);
+            bool sucesso;
 
-            case 'D':
-                {
-                    Str paren = l_desempilha(pilha_oper);
-                    s_destroi(paren);
-                    i++;
-                }
-                break;
+            if (c == '=')
+                sucesso = atribui(pilha_op, pilha_oper);
+            else
+                sucesso = opera(pilha_op, pilha_oper);
 
-            case 'T':
-                if (l_tam(pilha_op) == 1)
-                    resultado = l_desempilha(pilha_op);
-                else
-                    resultado = s_cria("#ERRO expressao incompleta");
-                break;
+            if (!sucesso)
+                resultado = s_cria("#ERRO faltam operandos");
+        }
+        break;
 
-            case 'R':
-                if (cat_entrada == CAT_FECHA_PAREN)
-                    resultado = s_cria("#ERRO falta (");
-                else
-                    resultado = s_cria("#ERRO falta )");
-                break;
+        case 'D':
+        {
+            Str paren = l_desempilha(pilha_oper);
+            s_destroi(paren);
+            i++;
+        }
+        break;
+
+        case 'T':
+            if (l_tam(pilha_op) == 1)
+                resultado = l_desempilha(pilha_op);
+            else
+                resultado = s_cria("#ERRO expressao incompleta");
+            break;
+
+        case 'R':
+            if (cat_entrada == CAT_FECHA_PAREN)
+                resultado = s_cria("#ERRO falta (");
+            else
+                resultado = s_cria("#ERRO falta )");
+            break;
         }
     }
 
