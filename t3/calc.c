@@ -29,7 +29,7 @@ static Calc CALC = NULL;
 // AUXILIARES
 const char tabela(int topo, int entrada)
 {
-    static const char tab[6][7] =
+    static const char tab[7][7] =
         {
             //    F	   +-   */	 ^	  (     )   =      // p\e
             {'T', 'E', 'E', 'E', 'E', 'R', 'E'},  // V
@@ -37,6 +37,7 @@ const char tabela(int topo, int entrada)
             {'O', 'O', 'O', 'E', 'E', 'O', 'E'},  // */
             {'O', 'O', 'O', 'E', 'E', 'O', 'E'},  // ^
             {'R', 'E', 'E', 'E', 'E', 'D', 'E'},  // (
+            {'R', 'R', 'R', 'R', 'R', 'R', 'R'},  // )
             {'O', 'E', 'E', 'E', 'E', 'O', 'E'}}; // =
 
     return tab[topo][entrada];
@@ -394,7 +395,22 @@ Str calculadora(Str expressão)
 
         case 'T':
             if (l_tam(pilha_op) == 1)
-                resultado = l_desempilha(pilha_op);
+            {
+                Str final = l_desempilha(pilha_op);
+                bool ok;
+                double valor = valor_de_operando(final, &ok);
+
+                if (ok)
+                {
+                    resultado = s_cria_número(valor);
+                    s_destroi(final);
+                }
+                else
+                {
+                    s_destroi(final);
+                    resultado = s_cria("#ERRO variavel nao existe");
+                }
+            }
             else
                 resultado = s_cria("#ERRO expressao incompleta");
             break;

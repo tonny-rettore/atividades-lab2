@@ -1,5 +1,5 @@
 // includes, constantes e declarações {{{1
-#include "str-t3.h"
+#include "str.h"
 
 #include <stdio.h>
 #include <stdlib.h>

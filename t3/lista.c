@@ -49,7 +49,7 @@ Lista l_cria_separando(Str s, Str sep)
             if (i > inicio)
             {
                 Str parte = s_cria_substring(s, inicio, i - inicio);
-                l_insere_fim(&l, parte);
+                l_insere_fim(l, parte);
             }
 
             inicio = i + 1;
@@ -59,7 +59,7 @@ Lista l_cria_separando(Str s, Str sep)
     if (inicio < s_tam(s))
     {
         Str parte = s_cria_substring(s, inicio, s_tam(s) - inicio);
-        l_insere_fim(&l, parte);
+        l_insere_fim(l, parte);
     }
 
     return l;
