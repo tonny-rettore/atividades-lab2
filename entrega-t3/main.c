@@ -3,7 +3,6 @@
 // EXECUTAR: ./t3 [arquivo de entrada] [arquivo de saida]
 
 
-
 #include "String/str.h"
 #include "Lista/lista.h"
 #include "Calculadora/calc.h"
