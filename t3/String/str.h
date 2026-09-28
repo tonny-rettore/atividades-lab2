@@ -5,8 +5,8 @@
 // Str é o tipo de dados para nossas strings
 typedef struct str *Str;
 
-#include "utf8.h"
-#include "lista.h"
+#include "Utf8/utf8.h"
+#include "Lista/lista.h"
 
 #include <stdbool.h>
 

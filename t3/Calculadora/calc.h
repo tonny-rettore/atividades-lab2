@@ -5,8 +5,8 @@
 #ifndef CALC_H
 #define CALC_H
 
-#include "str.h"
-#include "lista.h"
+#include "String/str.h"
+#include "Lista/lista.h"
 
 // Calcula o valor de expressão e retorna uma nova Str contendo o resultado.
 // Em cado de erro, os primeiros caracteres da Str de retorno são "#ERRO ".

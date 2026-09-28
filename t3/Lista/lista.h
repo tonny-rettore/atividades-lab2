@@ -8,7 +8,7 @@ typedef struct lista *Lista;
 
 typedef struct no *No;
 
-#include "str.h"
+#include "String/str.h"
 
 #include <stdbool.h>
 

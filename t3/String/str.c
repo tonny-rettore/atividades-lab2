@@ -1,5 +1,5 @@
 // includes, constantes e declarações {{{1
-#include "str.h"
+#include "String/str.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -608,7 +608,7 @@ void s_grava_arquivo(Str_c s, char *nome)
 
 Str s_cria_número(double num)
 {
-    char texto[100];
+    char texto[500];
 
     snprintf(texto, sizeof(texto), "%.15f", num);
 

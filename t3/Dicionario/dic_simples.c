@@ -1,7 +1,7 @@
 // implementação simples de dicionário, usando vetor
 // l226b
 
-#include "dicionario.h"
+#include "Dicionario/dicionario.h"
 
 #include <assert.h>
 #include <string.h>

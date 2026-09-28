@@ -1,5 +1,5 @@
-#include "calc.h"
-#include "dicionario.h"
+#include "Calculadora/calc.h"
+#include "Dicionario/dicionario.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -27,7 +27,7 @@ typedef struct calc
 static Calc CALC = NULL;
 
 // AUXILIARES
-const char tabela(int topo, int entrada)
+static char tabela(int topo, int entrada)
 {
     static const char tab[7][7] =
         {
@@ -150,21 +150,20 @@ static double valor_de_operando(Str operando, bool *ok)
 {
     unichar primeiro = s_ch(operando, 0);
 
-    // se é um número literal
-    if (eh_digito(primeiro) || primeiro == '.')
+    if (!eh_inicio_identificador(primeiro))
     {
         *ok = true;
         return s_número(operando);
     }
 
-    // se é uma variável (começa com letra ou $)
+    // senão é variável
     garante_quecalc_criado();
 
     Str valor_str = dic_busca(CALC->dic, operando);
 
     if (valor_str == VALOR_NÃO_EXISTE)
     {
-        *ok = false; // variável não existe no dicionário
+        *ok = false;
         return 0;
     }
 
@@ -172,14 +171,14 @@ static double valor_de_operando(Str operando, bool *ok)
     return s_número(valor_str);
 }
 
-static bool opera(Lista pilha_op, Lista pilha_oper)
+static const char *opera(Lista pilha_op, Lista pilha_oper)
 {
     Str operador = l_desempilha(pilha_oper);
 
     if (l_tam(pilha_op) < 2)
     {
         s_destroi(operador);
-        return false;
+        return "#ERRO faltam operandos";
     }
 
     Str str_dir = l_desempilha(pilha_op);
@@ -194,7 +193,7 @@ static bool opera(Lista pilha_op, Lista pilha_oper)
         s_destroi(str_esq);
         s_destroi(str_dir);
         s_destroi(operador);
-        return false;
+        return "#ERRO variavel nao existe";
     }
 
     double res = 0;
@@ -207,7 +206,7 @@ static bool opera(Lista pilha_op, Lista pilha_oper)
         s_destroi(str_esq);
         s_destroi(str_dir);
         s_destroi(operador);
-        return false;
+        return "#ERRO divisao por zero";
     }
 
     switch (op)
@@ -235,7 +234,7 @@ static bool opera(Lista pilha_op, Lista pilha_oper)
     s_destroi(str_dir);
     s_destroi(operador);
 
-    return true;
+    return NULL;
 }
 
 // PRINCIPAIS
@@ -277,14 +276,14 @@ Lista tokeniza(Str txt)
 
     return tokens;
 }
-static bool atribui(Lista pilha_op, Lista pilha_oper)
+static const char *atribui(Lista pilha_op, Lista pilha_oper)
 {
     Str operador_igual = l_desempilha(pilha_oper); // pro =
 
     if (l_tam(pilha_op) < 2)
     {
         s_destroi(operador_igual);
-        return false;
+        return "#ERRO faltam operandos";
     }
 
     Str str_valor = l_desempilha(pilha_op);
@@ -298,7 +297,7 @@ static bool atribui(Lista pilha_op, Lista pilha_oper)
         s_destroi(str_valor);
         s_destroi(str_nome);
         s_destroi(operador_igual);
-        return false;
+        return "#ERRO variavel nao existe";
     }
 
     Str valor_como_str = s_cria_número(valor);
@@ -311,7 +310,7 @@ static bool atribui(Lista pilha_op, Lista pilha_oper)
         s_destroi(str_nome);
         s_destroi(valor_como_str);
         s_destroi(operador_igual);
-        return false;
+        return "#ERRO atribuicao invalida";
     }
 
     garante_quecalc_criado();
@@ -319,14 +318,17 @@ static bool atribui(Lista pilha_op, Lista pilha_oper)
     Str valor_antigo = dic_insere(CALC->dic, str_nome, valor_como_str);
 
     if (valor_antigo != VALOR_NÃO_EXISTE)
+    {
         s_destroi(valor_antigo);
+        s_destroi(str_nome);
+    }
 
     l_empilha(pilha_op, s_cria_cópia(valor_como_str));
 
     s_destroi(str_valor);
     s_destroi(operador_igual);
 
-    return true;
+    return NULL;
 }
 
 Str calculadora(Str expressão)
@@ -373,15 +375,20 @@ Str calculadora(Str expressão)
         {
             Str topo_oper = l_topo(pilha_oper);
             unichar c = s_ch(topo_oper, 0);
-            bool sucesso;
+
+            const char *erro;
 
             if (c == '=')
-                sucesso = atribui(pilha_op, pilha_oper);
+            {
+                erro = atribui(pilha_op, pilha_oper);
+            }
             else
-                sucesso = opera(pilha_op, pilha_oper);
+            {
+                erro = opera(pilha_op, pilha_oper);
+            }
 
-            if (!sucesso)
-                resultado = s_cria("#ERRO faltam operandos");
+            if (erro != NULL)
+                resultado = s_cria(erro);
         }
         break;
 

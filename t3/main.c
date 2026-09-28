@@ -1,6 +1,11 @@
-#include "str.h"
-#include "lista.h"
-#include "calc.h"
+// para rodar é só:
+// COMPILAR: make
+// EXECUTAR: ./t3 [arquivo de entrada] [arquivo de saida]
+
+
+#include "String/str.h"
+#include "Lista/lista.h"
+#include "Calculadora/calc.h"
 
 #include <stdio.h>
 
