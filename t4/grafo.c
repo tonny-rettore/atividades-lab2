@@ -297,7 +297,10 @@ void g_arestas_que_chegam(Grafo self, int nó_destino)
     self->tipo_consulta = CONSULTA_CHEGAM;
     self->no_consulta = nó_destino;
     self->no_varredura = 0;
-    self->aresta_atual = self->nos[0].arestas;
+    self->aresta_atual = NULL;
+
+    if (self->num_nos > 0)
+        self->aresta_atual = self->nos[0].arestas;
 }
 
 void *g_próxima_aresta(Grafo self, int *p_nó_vizinho)
@@ -349,3 +352,151 @@ void *g_próxima_aresta(Grafo self, int *p_nó_vizinho)
 }
 
 // ----- ALGORITMOS -------- //
+#define CICLO_NAO_VISITADO 0
+#define CICLO_EM_VISITA 1
+#define CICLO_JA_VISITADO 2
+
+static void preenche_vetor_visitados(int *estado, int tam)
+{
+    for (int i = 0; i < tam; i++)
+    {
+        estado[i] = CICLO_NAO_VISITADO;
+    }
+}
+
+static bool g_tem_ciclo_rec(Grafo self, int estado[], int no)
+{
+    estado[no] = CICLO_EM_VISITA;
+
+    for (Aresta a = self->nos[no].arestas; a != NULL; a = a->prox)
+    {
+        int vizinho = a->destino;
+
+        if (estado[vizinho] == CICLO_EM_VISITA)
+            return true;
+
+        if (estado[vizinho] == CICLO_NAO_VISITADO)
+        {
+            if (g_tem_ciclo_rec(self, estado, vizinho))
+                return true;
+        }
+    }
+
+    estado[no] = CICLO_JA_VISITADO;
+    return false;
+}
+
+bool g_tem_ciclo(Grafo self)
+{
+    if (self == NULL)
+        return false;
+
+    int tam = g_num_nós(self);
+    if (tam <= 0)
+        return false;
+
+    int *estado = malloc(tam * sizeof(int));
+    if (estado == NULL)
+        return false;
+
+    // preenche tudo como na visitado
+    preenche_vetor_visitados(estado, tam);
+
+    for (int i = 0; i < tam; i++)
+    {
+        if (estado[i] == CICLO_NAO_VISITADO)
+        {
+            if (g_tem_ciclo_rec(self, estado, i))
+            {
+                free(estado);
+                return true;
+            }
+        }
+    }
+
+    free(estado);
+    return false;
+}
+
+// retorna uma fila de inteiros contendo os números dos nós do grafo em
+//   uma ordem em que, se o nó 'a' antecede 'b', não existe uma aresta
+//   de 'b' para 'a' no grafo
+// deve retornar uma fila vazia caso tal ordem não exista
+// quem chama esta função é responsável por destruir a fila.
+Fila *g_ordem_topológica(Grafo self)
+{
+    if (self == NULL)
+        return NULL;
+
+    int tam_grafo = g_num_nós(self);
+
+    int *graus = malloc(tam_grafo * sizeof(int));
+    if (graus == NULL)
+        return NULL;
+
+    for (int i = 0; i < tam_grafo; i++)
+        graus[i] = 0;
+
+    for (int i = 0; i < tam_grafo; i++)
+    {
+        int vizinho;
+
+        g_arestas_que_chegam(self, i);
+
+        while (g_próxima_aresta(self, &vizinho) != NULL)
+            graus[i]++;
+    }
+
+    Fila *f_grau_zero = f_cria(sizeof(int));
+    Fila *f_resultado = f_cria(sizeof(int));
+
+    if (f_grau_zero == NULL || f_resultado == NULL)
+    {
+        free(graus);
+        if (f_grau_zero != NULL)
+            f_destrói(f_grau_zero);
+        if (f_resultado != NULL)
+            f_destrói(f_resultado);
+        return NULL;
+    }
+
+    for (int i = 0; i < tam_grafo; i++)
+    {
+        if (graus[i] == 0)
+            f_insere(f_grau_zero, &i);
+    }
+
+    int tam_resultado = 0;
+
+    while (!f_tá_vazia(f_grau_zero))
+    {
+        int no_sendo_removido;
+
+        f_remove(f_grau_zero, &no_sendo_removido);
+        f_insere(f_resultado, &no_sendo_removido);
+        tam_resultado++;
+
+        g_arestas_que_partem(self, no_sendo_removido);
+
+        int vizinho;
+
+        while (g_próxima_aresta(self, &vizinho) != NULL)
+        {
+            graus[vizinho]--;
+
+            if (graus[vizinho] == 0)
+                f_insere(f_grau_zero, &vizinho);
+        }
+    }
+
+    f_destrói(f_grau_zero);
+    free(graus);
+
+    if (tam_resultado != tam_grafo)
+    {
+        f_destrói(f_resultado);
+        f_resultado = f_cria(sizeof(int));
+    }
+
+    return f_resultado;
+}
