@@ -430,6 +430,9 @@ Fila g_ordem_topológica(Grafo self)
 
     int tam_grafo = g_num_nós(self);
 
+    if (tam_grafo == 0)
+        return f_cria(sizeof(int));
+
     int *graus = malloc(tam_grafo * sizeof(int));
     if (graus == NULL)
         return NULL;
