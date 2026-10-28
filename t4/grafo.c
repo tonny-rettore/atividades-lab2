@@ -423,7 +423,7 @@ bool g_tem_ciclo(Grafo self)
 //   de 'b' para 'a' no grafo
 // deve retornar uma fila vazia caso tal ordem não exista
 // quem chama esta função é responsável por destruir a fila.
-Fila *g_ordem_topológica(Grafo self)
+Fila g_ordem_topológica(Grafo self)
 {
     if (self == NULL)
         return NULL;
@@ -447,8 +447,8 @@ Fila *g_ordem_topológica(Grafo self)
             graus[i]++;
     }
 
-    Fila *f_grau_zero = f_cria(sizeof(int));
-    Fila *f_resultado = f_cria(sizeof(int));
+    Fila f_grau_zero = f_cria(sizeof(int));
+    Fila f_resultado = f_cria(sizeof(int));
 
     if (f_grau_zero == NULL || f_resultado == NULL)
     {
