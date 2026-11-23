@@ -538,10 +538,8 @@ bool eh_recorde(int pontos, estado_t *est)
 }
 
 // printfs do menu principal
-void escreve_painel_menu_principal(estado_t *est)
+void escreve_painel_menu_principal(estado_t *est, bool recorde)
 {
-    bool recorde = eh_recorde(est->pontos, est);
-
     printf("\nSua pontuação foi: %d\n", est->pontos);
 
     if (recorde)
@@ -558,10 +556,13 @@ void menu_principal(estado_t *est)
 {
     printf("\n");
     system("clear");
+
+    bool recorde = eh_recorde(est->pontos, est);  // mudei aqui, dizia que nao entrava no top 3 mesmo quando entrava pq eu verificava depois de add no vetor se tinha algum valor maior, ai como era igual dava falso
+
     atualiza_recordes(est->pontos, est);
     grava_arq(est);
 
-    escreve_painel_menu_principal(est);
+    escreve_painel_menu_principal(est, recorde); // ai aqui passo como parametro se é recorde
 
     while (true) {
         char tecla = lechar();
